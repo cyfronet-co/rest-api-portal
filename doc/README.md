@@ -5,10 +5,14 @@ Following REST Endpoints are available:
   * `/api/sites/:site_key/allocations` - returns information about all
     allocations important for the site (drafts and allocations in negociation
     are not returned)
+  * `/api/sites/:site_key/groups` - returns information about all
+    groups important for the site.
+  * `/api/sites/:site_key/users` - returns information about all users important for the site.
+  * `/api/services/:service_key/users` - returns information about all users in service
 
 ## Authentication
-Each site is secured by separate pair of keys which allow to generate signed JWT
-token. Site admin needs to upload the public key to the portal, private key
+Each site and service is secured by separate pair of keys which allow to generate signed JWT
+token. Admin needs to upload the public key to the portal, private key
 should be keep secured and it should be used to generate JWT tokens.
 
 Use the following commands to generate new private/public key:
@@ -29,27 +33,42 @@ pip install pyjwt
 ```
 
 ```python
-def generate_curl(hostname, site):
-    """
-    Generate curls for API
-    :param hostname: hostname of Grants system app
-    :param site: site key example - CYFRONET-ZEUS
-    :return: 
-    """
+import jwt
+import datetime
+
+def generate_curl(site):
     with open(site + '.key', 'rb') as f:
         private_key = f.read()
     exp = (datetime.datetime.now() + datetime.timedelta(minutes=10)).strftime('%s')
     encoded = jwt.encode({'name': site, 'exp': exp}, private_key, algorithm='ES512')
-    print('curl --header "Authorization:Bearer {}" https://{}/api/sites/{}/grants'.format(encoded, hostname, site))
-    print('curl --header "Authorization:Bearer {}" https://{}/api/sites/{}/allocations'.format(encoded, hostname, site))
+
+    print('curl --header "Authorization:Bearer {}" https://grants.pre.plgrid.pl/api/sites/{}/grants'.format(encoded, site))
+    print('curl --header "Authorization:Bearer {}" https://grants.pre.plgrid.pl/api/sites/{}/allocations'.format(encoded, site))
+
+
 if __name__ == '__main__':
-    #generate_curl(hostname=, site=)
+    generate_curl('CYFRONET-PROMETHEUS')
 ```
+
+### Testing Site REST API in development mode
+When `db:seed` is used example sites are generated. For each site script
+generates public key (stored in the DB) and private key (stored in the `tmp`
+directory). The key can be used to test site REST API by using `curl` commands.
+We have a dedicated `rake` task which simplify this process and generate example
+curl invocations:
+
+```
+./bin/rails jwt:token[site_key]
+
+#e.g.
+./bin/rails jwt:token[CYFRONET-PROMETHEUS]
+```
+
 
 ## Grants REST API
 Grants REST API returns list of all Grants important for the site. By important
-we are understand grants in the following states: `active`, `finished`, `closed`,
-`in_renegotiation`, `blocked` with allocations on the site.
+we are understand grants in the following statuses: `accepted`, `blocked`,
+`finished`, `settled` with allocations on the site.
 
 ### Endpoint
 ```
@@ -61,13 +80,15 @@ we are understand grants in the following states: `active`, `finished`, `closed`
 [
   {
     name: String,
+    author: String,
     title: String,
     description: Text,
+    oecd: String,
+    pilot: Boolean,
     start: Date,
     end: Date,
     lastChange: Time,
     team: String,
-    state: Enum(active, finished, closed, in_renegotiation, blocked),
     status: Enum(accepted, blocked, finished, settled),
     relatedProjects: [
       {
@@ -76,6 +97,7 @@ we are understand grants in the following states: `active`, `finished`, `closed`
         url: String,
         amount: Number,
         source: String,
+
       },
       ...
     ]
@@ -97,8 +119,9 @@ we are understand grants in the following states: `active`, `finished`, `closed`
 ## Allocations REST API
 Allocations REST API returns list of all allocations important to the site. By
 important we are understand site allocation from the grant important to the site
-(see the previous section) in the following states: `accepted`, `blocked`,
-`user_renegotiation`, `admin_renegotiation`, `ended`.
+(see the previous section) in the following statuses: `accepted`, `blocked`.
+`start`-`end` interval should be taken into account  to check if the
+allocation is active on the site.
 
 ### Endpoint
 ```
@@ -107,16 +130,17 @@ important we are understand site allocation from the grant important to the site
 
 ### Schema
 ```
+
 [
   {
     name: String,
     grantName: String,
     resource: String,
     site: String,
+    pilot: Boolean,
     start: Date,
     end: Date,
     lastChange: Time,
-    state: Enum(accepted, blocked, user_renegotiation, admin_renegotiation, ended),
     status: Enum(accepted, blocked),
     parameterValues: [
       {
@@ -133,3 +157,109 @@ important we are understand site allocation from the grant important to the site
   * `accepted` - allocation is accepted by the site admin and should be active
     in the `start`-`end` interval.
   * `blocked` - allocation grant was blocked by the operator or site admin
+
+
+## Groups REST API
+
+Groups REST API returns list of all groups that have at least grant with allocation on particular site.
+
+The Groups API is versioned using a header parameter.
+That means, requested version have to be passed in specific format as a header parameter
+(e.g. `Accepted: v1.0` for the first API version).
+If no version is specified or the format is wrong, the first (v1.0) version of API is returned.
+
+### Endpoint
+```
+/api/sites/:site_key/groups
+```
+
+### Schema
+
+#### v1.0:
+
+```
+    {
+      "teamId": "plgguser1group",
+      "name": "plgguser1group",
+      "status": "accepted",
+      "type": "private",
+      "teamLeaders": [
+        "plguser1",
+        "plgroot"
+      ],
+      "teamMembers": [
+        "plgroot",
+        "plguser1"
+      ]
+    }
+```
+
+#### v2.0:
+```
+    {
+      "group_id": String,
+      "description": String,
+      "type": String,
+      "status": String,
+      "members": [
+        {
+          "login": String,
+          "cuid": String
+          "role": String
+        },
+      ]
+    },
+```
+
+
+## Users REST API
+
+Users REST API returns list of all users that have at least one grant with allocation on particular site.
+
+### Endpoint
+```
+/api/sites/:site_key/users
+/api/sites/:site_key/user/:login
+```
+
+### Schema
+
+```
+    {
+      "id": Integer,
+      "email": String,
+      "firstName": String,
+      "lastName": String,
+      "login": String,
+      "status": String,
+      "affiliationList": [
+        {
+          "type": String,
+          "units": [
+            String,
+            String
+          ]
+        }
+      ]
+    }
+```
+
+## Service users REST API
+
+Service users REST API returns list of all users in service.
+
+### Endpoint
+```
+/api/services/:service_key/users
+```
+
+### Schema
+
+```
+    {
+      "login": String,
+      "state": String,
+      "motivation": String
+    }
+```
+
