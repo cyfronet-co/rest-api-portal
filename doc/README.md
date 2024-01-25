@@ -6,6 +6,8 @@ Following REST Endpoints are available:
     allocations important for the site (drafts and allocations in negociation
     are not returned)
   * `/api/sites/:site_key/groups` - returns information about all
+    groups in Portal PLGrid.
+  * `/api/sites/:site_key/lcp_groups` - returns information about all
     groups important for the site.
   * `/api/sites/:site_key/users` - returns information about all users important for the site.
   * `/api/services/:service_key/users` - returns information about all users in service
@@ -162,6 +164,13 @@ allocation is active on the site.
 ## Groups REST API
 
 Groups REST API returns list of all groups that have at least grant with allocation on particular site.
+There are three possible group types that can be returned by the api: `private`, `technical` and `operational`.
+
+### Statuses meanings
+ * `accepted` - accepted group that can be managed and used to create grant (only if it is a private group).
+ * `archived` - group archived by the main manager or operator. Archived groups are no longer active. 
+                Moreover, archived groups cannot be managed or used to create new grant.
+ * `blocked` - group blocked by operator. Group like this can be later unblocked.
 
 The Groups API is versioned using a header parameter.
 That means, requested version have to be passed in specific format as a header parameter
@@ -171,6 +180,7 @@ If no version is specified or the format is wrong, the first (v1.0) version of A
 ### Endpoint
 ```
 /api/sites/:site_key/groups
+/api/sites/:site_key/groups/:group_name
 ```
 
 ### Schema
@@ -179,24 +189,37 @@ If no version is specified or the format is wrong, the first (v1.0) version of A
 
 ```
     {
-      "teamId": "plgguser1group",
-      "name": "plgguser1group",
-      "status": "accepted",
-      "type": "private",
+      "teamId": String,
+      "name": String,
+      "status": String,
+      "type": String,
       "teamLeaders": [
-        "plguser1",
-        "plgroot"
+        String
       ],
       "teamMembers": [
-        "plgroot",
-        "plguser1"
+        String
       ]
     }
 ```
 
-#### v2.0:
+
+## LCP Groups REST API
+
+This endpoint is designed to integrate the Portal PLGrid with the LUMI supercomputer via the Puhuri Core.
+It returns basic information about group and more specified information about group's members 
+like CUID (Community Unique Identifier) necessary for user identification in Puhuri 
+or user's role in the team like: `main_manager`, `manager` or `member`
+
+### Endpoint
 ```
-    {
+/api/sites/:site_key/lcp_groups
+/api/sites/:site_key/lcp_groups/:group_name
+```
+
+### Schema
+
+```
+{
       "group_id": String,
       "description": String,
       "type": String,
@@ -204,22 +227,36 @@ If no version is specified or the format is wrong, the first (v1.0) version of A
       "members": [
         {
           "login": String,
-          "cuid": String
-          "role": String
+          "cuid": String,
+          "role": String,
+          "status": String
         },
       ]
-    },
+    }
 ```
-
 
 ## Users REST API
 
-Users REST API returns list of all users that have at least one grant with allocation on particular site.
+Users REST API returns list of all users that have at least one service related to particular site.
+This endpoint also returns all user's affiliations with information like type, status, or affiliation's end date.
+
+### Statuses meaning
+ * `accepted` - active user
+ * `blocked` - user blocked by operator
+ * `rodo_revoked` - user revoked by RODO
+
+### Affiliations' types meaning
+* `Affiliations::AcademicUnitEmployee` - affiliation meant for employees of Polish universities having at least a doctoral degree.
+* `Affiliations::InstitutionalUnitEmployee` - affiliation designated for users with at least a doctoral degree who conduct research for a Polish research unit other than universities.
+* `Affiliations::HPCEmployee` - This affiliation is for employees of HPC centres.
+* `Affiliations::Subordinate` - an affiliation for 1st or 2nd degree students conducting research under the guidance of a supervisor with at least a PhD.
+* `Affiliations::PhdStudent` - an affiliation intended for doctoral students with a supervisor with at least a PhD.
+* `Affiliations::ExternalCollaborator` - affiliation intended for users conducting research abroad, cooperating with employees of a Polish scientific unit
 
 ### Endpoint
 ```
 /api/sites/:site_key/users
-/api/sites/:site_key/user/:login
+/api/sites/:site_key/users/:login
 ```
 
 ### Schema
@@ -232,13 +269,15 @@ Users REST API returns list of all users that have at least one grant with alloc
       "lastName": String,
       "login": String,
       "status": String,
-      "affiliationList": [
+      "affiliations": [
         {
           "type": String,
           "units": [
             String,
             String
-          ]
+          ],
+          "status": String,
+          "end": Date
         }
       ]
     }
