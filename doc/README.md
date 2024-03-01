@@ -11,6 +11,9 @@ Following REST Endpoints are available:
     groups important for the site.
   * `/api/sites/:site_key/users` - returns information about all users important for the site.
   * `/api/services/:service_key/users` - returns information about all users in service
+  * `/api/services/:service_key/users/:user_login/accept` - POST endpoint enabling to accept users in `need_confirmation` state
+  * `/api/users/:user_login/allocations` - returns user active allocations per site (authenticated by keycloak token)
+  * `/api/users/:user_login/services` - returns user active services per site (authenticated by keycloak token)
 
 ## Authentication
 Each site and service is secured by separate pair of keys which allow to generate signed JWT
@@ -66,6 +69,11 @@ curl invocations:
 ./bin/rails jwt:token[CYFRONET-PROMETHEUS]
 ```
 
+## Keycloak Authentication
+
+Endpoints starting with `api/users` are authenticated in different way - to access any of these
+endpoints keycloak JWT token must be provided in Authorization header.
+Generation of keycloak JWT token is descibred [here](https://developers.redhat.com/blog/2020/01/29/api-login-and-jwt-token-generation-using-keycloak).
 
 ## Grants REST API
 Grants REST API returns list of all Grants important for the site. By important
@@ -168,7 +176,7 @@ There are three possible group types that can be returned by the api: `private`,
 
 ### Statuses meanings
  * `accepted` - accepted group that can be managed and used to create grant (only if it is a private group).
- * `archived` - group archived by the main manager or operator. Archived groups are no longer active. 
+ * `archived` - group archived by the main manager or operator. Archived groups are no longer active.
                 Moreover, archived groups cannot be managed or used to create new grant.
  * `blocked` - group blocked by operator. Group like this can be later unblocked.
 
@@ -206,8 +214,8 @@ If no version is specified or the format is wrong, the first (v1.0) version of A
 ## LCP Groups REST API
 
 This endpoint is designed to integrate the Portal PLGrid with the LUMI supercomputer via the Puhuri Core.
-It returns basic information about group and more specified information about group's members 
-like CUID (Community Unique Identifier) necessary for user identification in Puhuri 
+It returns basic information about group and more specified information about group's members
+like CUID (Community Unique Identifier) necessary for user identification in Puhuri
 or user's role in the team like: `main_manager`, `manager` or `member`
 
 ### Endpoint
@@ -302,3 +310,56 @@ Service users REST API returns list of all users in service.
     }
 ```
 
+## Service user accept REST API
+
+POST endpoint to accept users who applied for service and have `need_confirmation` state.
+
+### Endpoint
+```
+/api/services/:service_key/users/:user_login/accept
+```
+
+Returns 200 if ok, 404 if service or user not found, 422 if user is not in `need_confirmation` state.
+
+## User keycloak REST API
+
+To access these endpoints keycloak JWT token must be provided.
+Token must be associated with provided `user_login`
+
+### Endpoint
+```
+/api/users/:user_login/allocations
+```
+
+Endpoint returns active user's allocations per site.
+Token must contain `api.access.allocations` scope.
+
+### Schema
+
+```
+    {
+      "allocations": [
+        "service_name": ["allocation_name", "allocation_name"],
+        "service_name": ["allocation_name"]
+      ]
+    }
+```
+
+### Endpoint
+```
+/api/users/:user_login/services
+```
+
+Endpoint returns user's active services per site.
+Token must contain `api.access.services` scope.
+
+### Schema
+
+```
+    {
+      "services": [
+        "service_name": ["service_name", "service_name"],
+        "service_name": ["service_name"]
+      ]
+    }
+```
