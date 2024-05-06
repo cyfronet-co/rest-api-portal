@@ -2,6 +2,7 @@
 Following REST Endpoints are available:
   * `/api/sites/:site_key/grants` - returns information about all grants
     important for the site (drafts and grants in negociation are not returned)
+  * `/api/sites/:site_key/grants/:grant_acronym/puhuri_projects` - POST endpoint enabling to assign project_id from puhuri to grant
   * `/api/sites/:site_key/allocations` - returns information about all
     allocations important for the site (drafts and allocations in negociation
     are not returned)
@@ -12,6 +13,7 @@ Following REST Endpoints are available:
   * `/api/sites/:site_key/users` - returns information about all users important for the site.
   * `/api/services/:service_key/users` - returns information about all users in service
   * `/api/services/:service_key/users/:user_login/accept` - POST endpoint enabling to accept users in `need_confirmation` state
+  * `/api/services/:service_key/emails` - POST endpoint enabling to send emails to users within service
   * `/api/users/:user_login/allocations` - returns user active allocations per site (authenticated by keycloak token)
   * `/api/users/:user_login/services` - returns user active services per site (authenticated by keycloak token)
 
@@ -47,8 +49,8 @@ def generate_curl(site):
     exp = (datetime.datetime.now() + datetime.timedelta(minutes=10)).strftime('%s')
     encoded = jwt.encode({'name': site, 'exp': exp}, private_key, algorithm='ES512')
 
-    print('curl --header "Authorization:Bearer {}" https://grants.pre.plgrid.pl/api/sites/{}/grants'.format(encoded, site))
-    print('curl --header "Authorization:Bearer {}" https://grants.pre.plgrid.pl/api/sites/{}/allocations'.format(encoded, site))
+    print('curl --header "Authorization:Bearer {}" https://portal.plgrid.pl/api/sites/{}/grants'.format(encoded, site))
+    print('curl --header "Authorization:Bearer {}" https://portal.plgrid.pl/api/sites/{}/allocations'.format(encoded, site))
 
 
 if __name__ == '__main__':
@@ -125,6 +127,22 @@ we are understand grants in the following statuses: `accepted`, `blocked`,
   * `finished` - grant is finished and it is in the settlement state
   * `settled` - grant settlement was send by the user and accepted by the
     operator.
+
+### Endpoint
+
+POST endpoint enabling to assign `project_id` from Puhuri to grant.
+
+```
+/api/sites/:site_key/grants/:grant_acronym/puhuri_projects
+```
+
+`project_id` should be sent as body parameter:
+
+```json
+{
+  "project_id": "example_project_ID"
+}
+```
 
 ## Allocations REST API
 Allocations REST API returns list of all allocations important to the site. By
@@ -321,6 +339,32 @@ POST endpoint to accept users who applied for service and have `need_confirmatio
 
 Returns 200 if ok, 404 if service or user not found, 422 if user is not in `need_confirmation` state.
 
+### Endpoint
+
+POST endpoint enabling to send emails to specific users within service.
+Available params:
+- `users[]` - array of user logins to which email should be sent
+- `groups[]` - array of group names to which users email should be sent
+- `skip_affiliation_validation` (default: `false`) - when `true` email could be sent to users without active affiliation
+
+Note: mails will be sent only to users within service (active state) even if user is provided as parameter.
+
+```
+/api/services/:service_key/emails&users[]=user1?users[]=user2?groups[]=group1?groups[]=group2
+```
+
+Mail subject and content should be sent as body parameters:
+
+```json
+{
+  "subject": "Subject",
+  "content": "Some <b>html</b> content"
+}
+```
+
+Content can contain html tags which will be sanitized.
+Every mail will have default footer attached and subject will have `[PLGrid][Service][:service_name]` prefix
+
 ## User keycloak REST API
 
 To access these endpoints keycloak JWT token must be provided.
@@ -338,9 +382,13 @@ Token must contain `api.access.allocations` scope.
 
 ```
     {
-      "allocations": [
-        "service_name": ["allocation_name", "allocation_name"],
-        "service_name": ["allocation_name"]
+      "allocations": [ {
+        "site_key": {
+          "resource_key": ["allocation_name", "allocation_name"]
+        },
+        "site_key": {
+          "resource_key": ["allocation_name"]
+        }
       ]
     }
 ```
@@ -358,8 +406,9 @@ Token must contain `api.access.services` scope.
 ```
     {
       "services": [
-        "service_name": ["service_name", "service_name"],
-        "service_name": ["service_name"]
+        "site_key": ["service_key", "service_key"],
+        "site_key": ["service_key"]
       ]
     }
 ```
+
