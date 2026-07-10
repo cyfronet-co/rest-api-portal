@@ -82,12 +82,20 @@ Grants REST API returns list of all Grants important for the site. By important
 we are understand grants in the following statuses: `accepted`, `blocked`,
 `finished`, `settled` with allocations on the site.
 
+The Grants API is versioned using a header parameter.
+That means, requested version have to be passed in specific format as a header parameter
+(e.g. `Accepted: v1.0` for the first API version).
+If no version is specified or the format is wrong, the first (v1.0) version of API is returned.
+
 ### Endpoint
 ```
 /api/sites/:site_key/grants
 ```
 
 ### Schema
+
+#### v1.0:
+
 ```
 [
   {
@@ -97,6 +105,39 @@ we are understand grants in the following statuses: `accepted`, `blocked`,
     description: Text,
     oecd: String,
     pilot: Boolean,
+    start: Date,
+    end: Date,
+    lastChange: Time,
+    team: String,
+    status: Enum(accepted, blocked, finished, settled),
+    relatedProjects: [
+      {
+        project_id: String,
+        title: String,
+        url: String,
+        amount: Number,
+        source: String,
+
+      },
+      ...
+    ]
+  },
+  ...
+[
+```
+
+#### v2.0
+
+```
+[
+  {
+    name: String,
+    author: String,
+    title: String,
+    description: Text,
+    oecd: String,
+    pilot: Boolean,
+    type: String,
     start: Date,
     end: Date,
     lastChange: Time,
@@ -358,12 +399,13 @@ Mail subject and content should be sent as body parameters:
 ```json
 {
   "subject": "Subject",
-  "content": "Some <b>html</b> content"
+  "content_en": "Some <b>html</b> content",
+  "content_pl": "Jakaś treść <b>html</b>"
 }
 ```
 
 Content can contain html tags which will be sanitized.
-Every mail will have default footer attached and subject will have `[PLGrid][Service][:service_name]` prefix
+Every mail will have default footer attached and subject will have `[PLGrid][Service][:service_name]` prefix or `[PLGrid][Service][:site_short_name]` prefix if site present.
 
 ## User keycloak REST API
 
@@ -411,4 +453,3 @@ Token must contain `api.access.services` scope.
       ]
     }
 ```
-
