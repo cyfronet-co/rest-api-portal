@@ -84,7 +84,7 @@ we are understand grants in the following statuses: `accepted`, `blocked`,
 
 The Grants API is versioned using a header parameter.
 That means, requested version have to be passed in specific format as a header parameter
-(e.g. `Accepted: v1.0` for the first API version).
+(e.g. `Accept: v1.0` for the first API version).
 If no version is specified or the format is wrong, the first (v1.0) version of API is returned.
 
 ### Endpoint
@@ -241,7 +241,7 @@ There are three possible group types that can be returned by the api: `private`,
 
 The Groups API is versioned using a header parameter.
 That means, requested version have to be passed in specific format as a header parameter
-(e.g. `Accepted: v1.0` for the first API version).
+(e.g. `Accept: v1.0` for the first API version).
 If no version is specified or the format is wrong, the first (v1.0) version of API is returned.
 
 ### Endpoint
